@@ -1,5 +1,6 @@
 import cv2
 import numpy as np
+import math
 import mediapipe as mp
 import time
 import threadedcamera as tcam
@@ -83,8 +84,10 @@ while True:
     # In Camera Frame, X axis is placed down, Z axis is the direction pointing out of camera.
     # Use right-handed coordinate.
     directionVectorZ = - handutils.getNormalVectorfromPlane(planeParanms)
-    directionVectorX, _ = handutils.fitLine(points3D[:, 9:13])
-    print(directionVectorX)
+    directionVectorY, _ = handutils.fitLine(points3D[:, 9:13])
+    directionVectorY = - directionVectorY
+    [x, y, z] = handutils.rotationMatrixToEulerAngles(handutils.getRotationMatrixfromVectors(directionVectorY, directionVectorZ))
+    print(np.array([x, y, z])*180/math.pi) # Pitch-yaw-roll angle
 
 
     # time.sleep(0.5)

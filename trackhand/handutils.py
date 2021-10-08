@@ -1,4 +1,5 @@
 import numpy as np
+import math
 
 
 def fitPlane(points):
@@ -60,10 +61,29 @@ def getNormalVectorfromPlane(params):
     v = v/np.linalg.norm(v)
     return v
 
-def getRotationMatrixfromVectors(axisX, axisZ):
-    # Compute rotation matrix from 2 axis direction vectors X, Z
+def getRotationMatrixfromVectors(axisY, axisZ):
+    # Compute rotation matrix from 2 axis direction vectors Y, Z
 
-    axisY = np.cross(axisZ, axisX) # axisX and axisZ are orthogonal unit vectors
+    axisX = np.cross(axisY, axisZ) # axisY and axisZ are orthogonal unit vectors
+    rotationMatrix = np.array([axisX, axisY, axisZ])
+    rotationMatrix = np.dot(np.array([[0, 1, 0], [1, 0, 0], [0, 0, -1]]), rotationMatrix)
+
+
+    return rotationMatrix
+
+def rotationMatrixToEulerAngles(R) :
     
+    sy = math.sqrt(R[0,0] * R[0,0] +  R[1,0] * R[1,0])
+    
+    singular = sy < 1e-6
 
-    return 
+    if  not singular :
+        x = math.atan2(R[2,1] , R[2,2])
+        y = math.atan2(-R[2,0], sy)
+        z = math.atan2(R[1,0], R[0,0])
+    else :
+        x = math.atan2(-R[1,2], R[1,1])
+        y = math.atan2(-R[2,0], sy)
+        z = 0
+
+    return np.array([x, y, z])
