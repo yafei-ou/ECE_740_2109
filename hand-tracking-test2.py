@@ -4,13 +4,14 @@ import mediapipe as mp
 import time
 import threadedcamera as tcam
 from handdetector import SingleHandDetector, Stabilizer
+from trackhand import handutils
 
-cap1 = cv2.VideoCapture(0 + cv2.CAP_DSHOW)
+cap1 = cv2.VideoCapture(1 + cv2.CAP_DSHOW)  # somehow, video 0 is used by something else.
 cap1.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 cap1.set(cv2.CAP_PROP_FRAME_WIDTH, 720)
 cap1.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-cap2 = cv2.VideoCapture(1 + cv2.CAP_DSHOW)
+cap2 = cv2.VideoCapture(2 + cv2.CAP_DSHOW)
 cap2.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 cap2.set(cv2.CAP_PROP_FRAME_WIDTH, 720)
 cap2.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -64,18 +65,29 @@ while True:
             cv2.circle(img2, (cx2,cy2), 3, (255,0,255), cv2.FILLED)
     else:
         continue
+    
+    points1 = np.array(points1)
+    points2 = np.array(points2)
 
-    point1 = points1[0]
-    point2 = points2[0]
-    pt1	= cv2.undistortPoints(point1, cameraMatrix1, distCoeffs1, None, R1, P1)
-    pt2	= cv2.undistortPoints(point2, cameraMatrix2, distCoeffs2, None, R2, P2)
+    pt1	= cv2.undistortPoints(points1, cameraMatrix1, distCoeffs1, None, R1, P1)
+    pt2	= cv2.undistortPoints(points2, cameraMatrix2, distCoeffs2, None, R2, P2)
 
-    points4D = cv2.triangulatePoints(P1, P2, pt1, pt2)
+    points4D = cv2.triangulatePoints(P1, P2, pt1, pt2) # 4x21 matrix, normalized
     points4D /= points4D[3]
+    points3D = points4D[0:3, :]
 
-    print(points4D)
 
-    time.sleep(0.5)
+    # Todo: thumb part should be removed when fitting to a plane
+    planeParanms, _ = handutils.fitPlane(points3D)
+    # print(planeParanms)
+    # In Camera Frame, X axis is placed down, Z axis is the direction pointing out of camera.
+    # Use right-handed coordinate.
+    directionVectorZ = - handutils.getNormalVectorfromPlane(planeParanms)
+    directionVectorX, _ = handutils.fitLine(points3D[:, 9:13])
+    print(directionVectorX)
+
+
+    # time.sleep(0.5)
     cTime = time.time()
     fps = 1/(cTime-pTime)
     pTime = cTime
