@@ -1,18 +1,20 @@
 import cv2
 import numpy as np
 import math
+import socket
+import struct
 import mediapipe as mp
 import time
 import threadedcamera as tcam
 from handdetector import SingleHandDetector, Stabilizer
 from trackhand import handutils
 
-cap1 = cv2.VideoCapture(1 + cv2.CAP_DSHOW)  # somehow, video 0 is used by something else.
+cap1 = cv2.VideoCapture(0 + cv2.CAP_DSHOW)  # somehow, video 0 is used by something else.
 cap1.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 cap1.set(cv2.CAP_PROP_FRAME_WIDTH, 720)
 cap1.set(cv2.CAP_PROP_BUFFERSIZE, 1)
 
-cap2 = cv2.VideoCapture(2 + cv2.CAP_DSHOW)
+cap2 = cv2.VideoCapture(1 + cv2.CAP_DSHOW)
 cap2.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 cap2.set(cv2.CAP_PROP_FRAME_WIDTH, 720)
 cap2.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -23,8 +25,8 @@ mpDraw = mp.solutions.drawing_utils
 threadedCam1 = tcam.ThreadedCamera(cap1)
 threadedCam2 = tcam.ThreadedCamera(cap2)
 
-handDetector1 = SingleHandDetector()
-handDetector2 = SingleHandDetector()
+handDetector1 = SingleHandDetector(useStabilizer=False)
+handDetector2 = SingleHandDetector(useStabilizer=False)
 
 
 ## Camera specification
@@ -42,6 +44,9 @@ R1, R2, P1, P2, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(cameraMatrix1,
 
 
 
+sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+server_address = ('192.168.0.3', 8005)
+
 pTime = 0
 while True:
     success1, img1 = threadedCam1.read()
@@ -52,10 +57,10 @@ while True:
     else:
         continue
 
-    handDetector1.runDetection(imgRGB1)
-    points1 = handDetector1.stabilize()
-    handDetector2.runDetection(imgRGB2)
-    points2 = handDetector2.stabilize()
+    points1 = handDetector1.runDetection(imgRGB1)
+    points2 = handDetector2.runDetection(imgRGB2)
+    # points1 = handDetector1.stabilize()
+    # points2 = handDetector2.stabilize()
 
     if points1 and points2:
         for pt1 in points1:
@@ -87,23 +92,25 @@ while True:
     directionVectorY, _ = handutils.fitLine(points3D[:, 9:13])
     directionVectorY = - directionVectorY
     [x, y, z] = handutils.rotationMatrixToEulerAngles(handutils.getRotationMatrixfromVectors(directionVectorY, directionVectorZ))
-    print(np.array([x, y, z])*180/math.pi) # Pitch-yaw-roll angle
 
+    # send data through UDP
+    message = np.concatenate((points3D[0:3, 9], np.array([x, y, z])))
+    print(message)
+    message_UDP = struct.pack('<6d', *message)
+    sock.sendto(message_UDP, server_address)
+    time.sleep(0.02)
 
-    # time.sleep(0.5)
     cTime = time.time()
     fps = 1/(cTime-pTime)
     pTime = cTime
 
     cv2.putText(img1,str(int(fps)), (10,70), cv2.FONT_HERSHEY_PLAIN, 3, (255,0,255), 3)
-
     cv2.imshow("Image", img1)
-
     cv2.putText(img2,str(int(fps)), (10,70), cv2.FONT_HERSHEY_PLAIN, 3, (255,0,255), 3)
-
     cv2.imshow("Image2", img2)
     if cv2.waitKey(5) & 0xFF == 27:
       break
+
 cap1.release()
 cap2.release()
 
