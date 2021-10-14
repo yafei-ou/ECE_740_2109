@@ -1,3 +1,4 @@
+from typing import Container
 import cv2
 import numpy as np
 import math
@@ -5,6 +6,7 @@ import socket
 import struct
 import mediapipe as mp
 import time
+import pickle
 import threadedcamera as tcam
 from handdetector import SingleHandDetector, Stabilizer
 from trackhand import handutils
@@ -25,8 +27,8 @@ mpDraw = mp.solutions.drawing_utils
 threadedCam1 = tcam.ThreadedCamera(cap1)
 threadedCam2 = tcam.ThreadedCamera(cap2)
 
-handDetector1 = SingleHandDetector(useStabilizer=False)
-handDetector2 = SingleHandDetector(useStabilizer=False)
+handDetector1 = SingleHandDetector()
+handDetector2 = SingleHandDetector()
 
 
 ## Camera specification
@@ -43,11 +45,16 @@ T = np.array([314.111143461680, -49.9034065181065, 18.4777366882179])
 R1, R2, P1, P2, Q, validPixROI1, validPixROI2 = cv2.stereoRectify(cameraMatrix1, distCoeffs1, cameraMatrix2, distCoeffs2, imageSize, R, T)
 
 
+## Load svm model
+with open('svm.pickle', 'rb') as fr:
+    clf = pickle.load(fr)
 
 sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 server_address = ('192.168.0.3', 8005)
 
 pTime = 0
+data = []
+count = 0
 while True:
     success1, img1 = threadedCam1.read()
     success2, img2 = threadedCam2.read()
@@ -59,8 +66,8 @@ while True:
 
     points1 = handDetector1.runDetection(imgRGB1)
     points2 = handDetector2.runDetection(imgRGB2)
-    # points1 = handDetector1.stabilize()
-    # points2 = handDetector2.stabilize()
+    points1 = handDetector1.stabilize()
+    points2 = handDetector2.stabilize()
 
     if points1 and points2:
         for pt1 in points1:
@@ -69,9 +76,11 @@ while True:
         for pt2 in points2:
             cx2, cy2 = int(pt2[0]), int(pt2[1])
             cv2.circle(img2, (cx2,cy2), 3, (255,0,255), cv2.FILLED)
+        count += 1
     else:
+        count = 0
         continue
-    
+
     points1 = np.array(points1)
     points2 = np.array(points2)
 
@@ -82,6 +91,22 @@ while True:
     points4D /= points4D[3]
     points3D = points4D[0:3, :]
 
+    if count < 5:
+        continue
+    elif count == 5:
+        init_point = points3D
+    # gesture
+    points3D_pred = points3D.copy()
+    points_2d = []
+    for i in range(3):
+        points3D_pred[i, :] = points3D_pred[i, :] - points3D_pred[i, 0]
+    points_2d.append(np.delete(points3D_pred, 0, axis=1))
+    points_2d = np.reshape(points_2d, (60,))
+    pred = clf.predict([points_2d])
+    # print(pred)
+
+    if pred[0] == 0.:
+        continue
 
     # Todo: thumb part should be removed when fitting to a plane
     planeParanms, _ = handutils.fitPlane(points3D)
@@ -93,8 +118,9 @@ while True:
     directionVectorY = - directionVectorY
     [x, y, z] = handutils.rotationMatrixToEulerAngles(handutils.getRotationMatrixfromVectors(directionVectorY, directionVectorZ))
 
+
     # send data through UDP
-    message = np.concatenate((points3D[0:3, 9], np.array([x, y, z])))
+    message = np.concatenate((points3D[0:3, 9] - init_point[0:3, 9], np.array([x, y, z])))
     print(message)
     message_UDP = struct.pack('<6d', *message)
     sock.sendto(message_UDP, server_address)
@@ -108,8 +134,19 @@ while True:
     cv2.imshow("Image", img1)
     cv2.putText(img2,str(int(fps)), (10,70), cv2.FONT_HERSHEY_PLAIN, 3, (255,0,255), 3)
     cv2.imshow("Image2", img2)
-    if cv2.waitKey(5) & 0xFF == 27:
-      break
+    key = cv2.waitKey(5)
+
+    # # save test data
+    # if key & 0xFF == 27:
+    #     np.save('data.npy', data)
+    #     break
+    # elif key & 0xFF == 13:
+    #     # save data
+    #     data.append(points3D)
+    
+    # just quit
+    if key & 0xFF == 27:
+        break
 
 cap1.release()
 cap2.release()
