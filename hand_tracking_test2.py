@@ -7,8 +7,8 @@ import struct
 import mediapipe as mp
 import time
 import pickle
-import threadedcamera as tcam
-from handdetector import SingleHandDetector, Stabilizer
+import trackhand.threadedcamera as tcam
+from trackhand.handdetector import SingleHandDetector, Stabilizer
 from trackhand import handutils
 
 cap1 = cv2.VideoCapture(0 + cv2.CAP_DSHOW)  # somehow, video 0 is used by something else.
