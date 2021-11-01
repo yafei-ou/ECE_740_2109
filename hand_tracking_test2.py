@@ -11,7 +11,7 @@ import trackhand.threadedcamera as tcam
 from trackhand.handdetector import SingleHandDetector, Stabilizer
 from trackhand import handutils
 
-cap1 = cv2.VideoCapture(0 + cv2.CAP_DSHOW)  # somehow, video 0 is used by something else.
+cap1 = cv2.VideoCapture(0 + cv2.CAP_DSHOW)
 cap1.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
 cap1.set(cv2.CAP_PROP_FRAME_WIDTH, 720)
 cap1.set(cv2.CAP_PROP_BUFFERSIZE, 1)
@@ -79,6 +79,10 @@ while True:
         count += 1
     else:
         count = 0
+        img_out = cv2.vconcat([img1, img2])
+        img_out = cv2.rotate(img_out, cv2.ROTATE_90_CLOCKWISE)
+        cv2.imshow("ImageOut", img_out)
+        key = cv2.waitKey(5)
         continue
 
     points1 = np.array(points1)
@@ -92,10 +96,17 @@ while True:
     points3D = points4D[0:3, :]
 
     if count < 5:
+        img_out = cv2.vconcat([img1, img2])
+        img_out = cv2.rotate(img_out, cv2.ROTATE_90_CLOCKWISE)
+        cv2.imshow("ImageOut", img_out)
+        key = cv2.waitKey(5)
+        if key & 0xFF == 27:
+            break
         continue
     elif count == 5:
         init_point = points3D
-    # gesture
+    
+    ## gesture prediction
     points3D_pred = points3D.copy()
     points_2d = []
     for i in range(3):
@@ -106,9 +117,15 @@ while True:
     # print(pred)
 
     if pred[0] == 0.:
+        img_out = cv2.vconcat([img1, img2])
+        img_out = cv2.rotate(img_out, cv2.ROTATE_90_CLOCKWISE)
+        cv2.imshow("ImageOut", img_out)
+        key = cv2.waitKey(5)
+        if key & 0xFF == 27:
+            break
         continue
 
-    # Todo: thumb part should be removed when fitting to a plane
+    ## Todo: thumb part should be removed when fitting to a plane
     planeParanms, _ = handutils.fitPlane(points3D)
     # print(planeParanms)
     # In Camera Frame, X axis is placed down, Z axis is the direction pointing out of camera.
@@ -119,7 +136,7 @@ while True:
     [x, y, z] = handutils.rotationMatrixToEulerAngles(handutils.getRotationMatrixfromVectors(directionVectorY, directionVectorZ))
 
 
-    # send data through UDP
+    ## send data through UDP
     message = np.concatenate((points3D[0:3, 9] - init_point[0:3, 9], np.array([x, y, z])))
     print(message)
     message_UDP = struct.pack('<6d', *message)
@@ -130,13 +147,13 @@ while True:
     fps = 1/(cTime-pTime)
     pTime = cTime
 
-    cv2.putText(img1,str(int(fps)), (10,70), cv2.FONT_HERSHEY_PLAIN, 3, (255,0,255), 3)
-    cv2.imshow("Image", img1)
-    cv2.putText(img2,str(int(fps)), (10,70), cv2.FONT_HERSHEY_PLAIN, 3, (255,0,255), 3)
-    cv2.imshow("Image2", img2)
+    img_out = cv2.vconcat([img1, img2])
+    img_out = cv2.rotate(img_out, cv2.ROTATE_90_CLOCKWISE)
+    cv2.putText(img_out,str(int(fps)), (10,70), cv2.FONT_HERSHEY_PLAIN, 3, (255,0,255), 3)
+    cv2.imshow("ImageOut", img_out)
     key = cv2.waitKey(5)
 
-    # # save test data
+    ## save test data
     # if key & 0xFF == 27:
     #     np.save('data.npy', data)
     #     break
@@ -144,7 +161,11 @@ while True:
     #     # save data
     #     data.append(points3D)
     
-    # just quit
+    ## save image
+    # if key & 0xFF == 13:
+    #     cv2.imwrite("img_out.jpg", img_out)
+
+    ## just quit
     if key & 0xFF == 27:
         break
 
