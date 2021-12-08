@@ -87,3 +87,20 @@ def rotationMatrixToEulerAngles(R) :
         z = 0
 
     return np.array([x, y, z])
+
+
+def checkOneHand(pt1, pt2, fundamentalMat):
+    pt11 = np.squeeze(pt1)
+    pt22 = np.squeeze(pt2)
+    # print(pt11)
+    ones1 = np.ones((np.size(pt11,0), 1))
+    ones2 = np.ones((np.size(pt22,0), 1))
+    homo1 = np.column_stack((pt11, ones1))
+    homo2 = np.column_stack((pt22, ones2))
+    # print(homo1)
+    xfx = homo2[9,:] @ fundamentalMat @ np.transpose(homo1[9,:])
+
+    if abs(xfx)<50:
+        return True
+    else:
+        return False
