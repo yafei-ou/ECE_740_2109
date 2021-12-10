@@ -1,6 +1,6 @@
 # Hand Position-Based Robot Control for Tele-Sonography
 
-This is the repository hosting code and other relative files of the course project for ECE 740 Computer and Robot Vision (Fall 2021).
+This is the repository hosting code and other relative files of the course project for ECE 740 Computer and Robot Vision (Fall 2021). The team members are: Yi Hu; Kirill Makhachev; Yafei Ou.
 
 In this course project, we designed a system that utilizes computer vision to detect the movements of a user’s hand in free space which will be interpreted to control the robot’s manipulation of the US probe on the patient. With this system, the sonographer can remain at a distance or behind a plastic screen to observe the robot’s movements and the US feed in real-time and make adjustments as necessary. 
 
